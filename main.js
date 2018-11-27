@@ -4,13 +4,32 @@ const app = express();
 const mysql = require('mysql');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const cors = require('cors');
-const http = require('http').Server(app);
-var io = require('socket.io')(http);
-app.use(cors());
-app.use(bodyParser.json());
-
 const secretKey = "traceme";
+const cors = require('cors');
+
+app.use(bodyParser.json());
+app.use(cors({origin: "http://localhost:8100",credentials: true}));
+
+// Users online
+var users = [];
+
+//Create server using express
+var server = app.listen(8080, ()=>{
+    console.log("server started on port 8080");
+});
+
+//Create instance of socket.io on same port of express server
+var io = require('socket.io').listen(server);
+
+io.on('connection',(socket)=>{
+
+    socket.on('setId', id => {
+        users[id] = socket.id;
+        socket.user_id = id;
+        console.log(`user[${id}] is set to ${socket.id}`);
+    });
+
+});
 
 console.clear();
 
@@ -111,6 +130,12 @@ app.post('/contacts',verifyToken,(req,res)=>{
             
             let query = conn.query(sql, [notification], (err,result2)=>{
                 if(err) throw err;
+
+                if(users[result[0].user_id] !== undefined){
+                    io.to(users[result[0].user_id])
+                    .emit('new notification',{notification: "someone wants to add you"});
+                }
+
                 res.json({message: 'Request successful'});
             });
 
@@ -159,13 +184,4 @@ app.get('/notification-type/:id',verifyToken,(req,res)=>{
         if(err) throw err;
         res.json(result[0]);
     });
-});
-
-
-io.on('connection',(socket)=>{
-    console.log('new connection node');
-});
-
-var server = app.listen(8080, ()=>{
-    console.log("server started on port 8080");
 });
