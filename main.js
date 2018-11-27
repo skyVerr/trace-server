@@ -8,7 +8,7 @@ const secretKey = "traceme";
 const cors = require('cors');
 
 app.use(bodyParser.json());
-app.use(cors({origin: "http://localhost:8100",credentials: true}));
+app.use(cors({credentials: true}));
 
 // Users online
 var users = [];
@@ -131,10 +131,8 @@ app.post('/contacts',verifyToken,(req,res)=>{
             let query = conn.query(sql, [notification], (err,result2)=>{
                 if(err) throw err;
 
-                if(users[result[0].user_id] !== undefined){
                     io.to(users[result[0].user_id])
                     .emit('new notification',{notification: "someone wants to add you"});
-                }
 
                 res.json({message: 'Request successful'});
             });
@@ -146,6 +144,27 @@ app.post('/contacts',verifyToken,(req,res)=>{
 
 
 
+});
+
+app.post('/contacts/confirm',verifyToken,(req,res)=>{
+
+    if(req.body.notification.isConfirm == true){
+
+        let insert = [[req.body.notification.from_user_id],[req.body.notification.user_id]];
+        let sql = "INSERT INTO contacts(user_id,friend_id) VALUES (?)";
+
+        conn.query(sql,[insert],(err,result)=>{
+            if(err)throw err;
+            io.to(users[req.body.notification.from_user_id])
+            .emit('new notification',{notification:`${req.token.user.firstname} added you`});
+        });
+    }
+
+    let sql = "DELETE FROM user_notification WHERE user_notification_id =  "+req.body.notification.user_notification_id;  
+
+    let ha = conn.query(sql ,(err,result)=>{
+        if(err) throw err;
+    });
 });
 
 app.get('/contacts',verifyToken,(req,res)=>{
