@@ -11,7 +11,7 @@ app.use(bodyParser.json());
 app.use(cors({credentials: true}));
 
 // Users online
-var users = [];
+users = [];
 
 //Create server using express
 var server = app.listen(8080, ()=>{
@@ -27,6 +27,22 @@ io.on('connection',(socket)=>{
         users[id] = socket.id;
         socket.user_id = id;
         console.log(`user[${id}] is set to ${socket.id}`);
+    });
+
+    socket.on('disconnect', ()=>{
+        console.log('socket '+socket.user_id+' disconnected');
+        delete users[socket.user_id] ;
+    });
+
+    socket.on('join',data => {
+        socket.join(data.traceId);
+        console.log('user joined trace id = '+data.traceId);
+        socket.broadcast.to(data.traceId).emit('user join',data.user);
+    });
+
+    socket.on('location', data=> {
+        io.in(data.traceId).emit('receive location',data);
+        console.log('receive locaiton from'+data.user.user_id);
     });
 
 });
@@ -142,8 +158,6 @@ app.post('/contacts',verifyToken,(req,res)=>{
         }
     });
 
-
-
 });
 
 app.post('/contacts/confirm',verifyToken,(req,res)=>{
@@ -164,6 +178,10 @@ app.post('/contacts/confirm',verifyToken,(req,res)=>{
 
     let ha = conn.query(sql ,(err,result)=>{
         if(err) throw err;
+        if(req.body.notification.isConfirm == false){
+            io.to(users[req.body.notification.from_user_id])
+                .emit('new notification',{notification:`request decline`});
+        }
     });
 });
 
@@ -176,6 +194,15 @@ app.get('/contacts',verifyToken,(req,res)=>{
     });
 });
 
+app.delete('/contacts',verifyToken,(req,res)=>{
+    console.log(req.body);
+    let sql = "DELETE FROM contacts WHERE contact_id = ?";
+    conn.query(sql, [req.body.contact_id], (err,result)=>{
+        if(err) throw err;
+        res.json({message: "delete success"});
+    });
+});
+
 app.get('/notification',verifyToken,(req,res)=>{
     let sql = "SELECT * FROM user_notification WHERE user_id = ?";
 
@@ -183,6 +210,24 @@ app.get('/notification',verifyToken,(req,res)=>{
         if(err) throw err;
         res.json(result);
     });
+});
+
+app.post('/notification',verifyToken,(req,res)=>{
+    let sql = "INSERT INTO user_notification SET ? ";
+    conn.query(sql, [req.body], (err,result)=>{
+        if(err) throw err;
+        io.to(users[req.body.user_id])
+            .emit('traceReq',{notification:`Someone wants to trace you`,body: req.body});
+        res.json({message: "Notification sent"});
+    });
+});
+
+app.post('/notification/decline',verifyToken,(req,res)=>{
+    let sql = "DELETE FROM user_notification WHERE user_notification_id = ? ";
+    conn.query(sql, [req.body.user_notification_id], (err,result)=>{
+        if(err) throw err;
+        res.json("Decline success");
+    });   
 });
 
 app.get('/user/:id',verifyToken,(req,res)=>{
