@@ -42,7 +42,8 @@ io.on('connection',(socket)=>{
 
     socket.on('location', data=> {
         io.in(data.traceId).emit('receive location',data);
-        console.log('receive locaiton from'+data.user.user_id);
+        console.log('receive location from '+data.user.user_id+'having location=',data.location);
+        console.log(data);
     });
 
 });
@@ -67,7 +68,6 @@ app.post('/sign-up', (req,res)=>{
     let sql = ` INSERT INTO user SET
     firstname = '${req.body.user.firstname}',
     lastname = '${req.body.user.lastname}',
-    middlename = '${req.body.user.firstname}',
     password = '${hash}',
     email = '${req.body.user.email}'`;
 
@@ -79,7 +79,6 @@ app.post('/sign-up', (req,res)=>{
             email: req.body.email,
             firstname: req.body.user.firstname,
             lastname: req.body.user.lastname,
-            middlename: req.body.user.middlename,
             isPremium: false
         };
         const token = jwt.sign({user},secretKey);
@@ -118,7 +117,6 @@ app.post('/login',(req,res)=>{
                     email: result[0].email,
                     firstname: result[0].firstname,
                     lastname: result[0].lastname,
-                    middlename: result[0].middlename,
                     isPremium: result[0].isPremium
                 };
                 const token = jwt.sign({user},secretKey);
@@ -160,30 +158,6 @@ app.post('/contacts',verifyToken,(req,res)=>{
 
 });
 
-app.post('/contacts/confirm',verifyToken,(req,res)=>{
-
-    if(req.body.notification.isConfirm == true){
-
-        let insert = [[req.body.notification.from_user_id],[req.body.notification.user_id]];
-        let sql = "INSERT INTO contacts(user_id,friend_id) VALUES (?)";
-
-        conn.query(sql,[insert],(err,result)=>{
-            if(err)throw err;
-            io.to(users[req.body.notification.from_user_id])
-            .emit('new notification',{notification:`${req.token.user.firstname} added you`});
-        });
-    }
-
-    let sql = "DELETE FROM user_notification WHERE user_notification_id =  "+req.body.notification.user_notification_id;  
-
-    let ha = conn.query(sql ,(err,result)=>{
-        if(err) throw err;
-        if(req.body.notification.isConfirm == false){
-            io.to(users[req.body.notification.from_user_id])
-                .emit('new notification',{notification:`request decline`});
-        }
-    });
-});
 
 app.get('/contacts',verifyToken,(req,res)=>{
     let sql = "SELECT * FROM contacts WHERE user_id = ?";
@@ -217,7 +191,7 @@ app.post('/notification',verifyToken,(req,res)=>{
     conn.query(sql, [req.body], (err,result)=>{
         if(err) throw err;
         io.to(users[req.body.user_id])
-            .emit('traceReq',{notification:`Someone wants to trace you`,body: req.body});
+            .emit('new notification',{notification:`Someone wants to trace you`});
         res.json({message: "Notification sent"});
     });
 });
@@ -230,8 +204,43 @@ app.post('/notification/decline',verifyToken,(req,res)=>{
     });   
 });
 
+
+app.post('/notification/confirm',verifyToken,(req,res)=>{
+
+    if(req.body.notification.notification_type_id == 1){
+        if(req.body.notification.isConfirm == true){
+    
+            let insert = [[req.body.notification.from_user_id],[req.body.notification.user_id]];
+            let sql = "INSERT INTO contacts(user_id,friend_id) VALUES (?)";
+    
+            conn.query(sql,[insert],(err,result)=>{
+                if(err) console.log(err);
+                io.to(users[req.body.user_id])
+                    .emit('new notification',{notification:`Your request has been accepted`});
+                deleteNotificaton(req,res);
+            });
+        }
+    } 
+
+    if(req.body.notification.notification_type_id == 2){
+        deleteNotificaton(req,res);
+    }
+    
+});
+
+function deleteNotificaton(req,res){
+
+    let sql = "DELETE FROM user_notification WHERE user_notification_id =  "+req.body.notification.user_notification_id;  
+
+    let ha = conn.query(sql ,(err,result)=>{
+        if(err) throw err;
+        res.json({message: 'notification confirm'});
+    });
+
+}
+
 app.get('/user/:id',verifyToken,(req,res)=>{
-    let sql = "SELECT user_id,email,firstname,lastname,middlename FROM user WHERE user_id = ?";
+    let sql = "SELECT user_id,email,firstname,lastname FROM user WHERE user_id = ?";
 
     conn.query(sql,[req.params.id],(err,result)=>{
         if(err) throw err;
@@ -239,13 +248,38 @@ app.get('/user/:id',verifyToken,(req,res)=>{
     });
 });
 
-
-
 app.get('/notification-type/:id',verifyToken,(req,res)=>{
     let sql = "SELECT * FROM notification_type WHERE notification_type_id = ?";
 
     conn.query(sql,[req.params.id],(err,result)=>{
         if(err) throw err;
         res.json(result[0]);
+    });
+});
+
+app.post('/group',verifyToken, (req,res)=>{
+    let sql = "INSERT INTO trace_group(name) VALUES (?)";
+    conn.query(sql,[req.body.name],(err,result)=>{
+        if(err) throw err;
+        sql = "INSERT INTO user_group(user_id,group_id,isAdmin) VALUES (?)"
+        let insert = [req.token.user.user_id,result.insertId,1];
+        conn.query(sql,[insert],(err,result2)=>{
+            if(err) throw err;
+            res.json({
+                group_id: result.insertId,
+                name: req.body.name
+            });
+        });
+    })
+});
+
+app.get('/group',verifyToken, (req,res)=>{
+    let sql = `SELECT trace_group.group_id ,trace_group.name 
+    FROM user_group 
+    INNER JOIN trace_group ON trace_group.group_id = user_group.group_id 
+    WHERE user_group.user_id = ?`;
+    conn.query(sql,[req.token.user.user_id], (err,result)=>{
+        if(err) throw err;
+        res.json(result);
     });
 });
