@@ -23,6 +23,8 @@ var io = require('socket.io').listen(server);
 
 io.on('connection',(socket)=>{
 
+    socket.emit('getId',null);
+
     socket.on('setId', id => {
         users[id] = socket.id;
         socket.user_id = id;
@@ -30,14 +32,22 @@ io.on('connection',(socket)=>{
     });
 
     socket.on('disconnect', ()=>{
-        console.log('socket '+socket.user_id+' disconnected');
-        delete users[socket.user_id] ;
+        if(socket.user_id !== 'undefined'){
+            console.log('socket '+socket.user_id+' disconnected');
+            delete users[socket.user_id] ;
+        }
     });
 
     socket.on('join',data => {
         socket.join(data.traceId);
         console.log('user joined trace id = '+data.traceId);
         socket.broadcast.to(data.traceId).emit('user join',data.user);
+    });
+
+    socket.on('leave', data=>{
+        socket.leave(data.traceId);
+        console.log('user left trace id = '+data.traceId);
+        socket.broadcast.to(data.traceId).emit('user left',data.user);
     });
 
     socket.on('location', data=> {
