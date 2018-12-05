@@ -6,6 +6,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const secretKey = "traceme";
 const cors = require('cors');
+const formidable = require('formidable');
+var uniqid = require('uniqid');
 
 app.use(bodyParser.json());
 app.use(cors({credentials: true}));
@@ -71,24 +73,57 @@ const conn = mysql.createConnection({
 //Connect to database
 conn.connect();
 
-app.post('/sign-up', (req,res)=>{
+function uploadPhoto(req,res,next){
+    var form = new formidable.IncomingForm();
+    var profilePath;
 
-    let hash = bcrypt.hashSync(req.body.user.password, 10);
+    form.parse(req, (err,fields,files)=>{
+        req.body = fields;
+    });
+
+    form.on('fileBegin', function (name, file){
+        let newImageName = uniqid()+'.'+ file.name.split('.').pop();
+        profilePath = __dirname + '/images/' + newImageName;
+        file.path = profilePath;
+        profilePath = 'http://localhost:8080/images/' + newImageName;
+    });
+
+    form.on('file', function (name, file){
+        req.body.profile_picture = profilePath;
+        console.log('Uploaded ' + file.name);
+    });
+
+    form.on('end', () => {
+        req.body.profile_picture = profilePath;
+        next();
+    });
+
+}
+
+app.post('/sign-up',uploadPhoto, (req,res) => {
+
+    console.log(req.body);
+
+    let hash = bcrypt.hashSync(req.body.password, 10);
 
     let sql = ` INSERT INTO user SET
-    firstname = '${req.body.user.firstname}',
-    lastname = '${req.body.user.lastname}',
+    firstname = '${req.body.firstname}',
+    lastname = '${req.body.lastname}',
     password = '${hash}',
-    email = '${req.body.user.email}'`;
+    email = '${req.body.email}'`;
 
+    if(!!req.body.profile_picture) {
+        sql += `, profile_picture ='${req.body.profile_picture}'`;
+    }
+
+    console.log(conn.query(sql).sql);
     conn.query(sql, (err,result)=> {
         if(err) throw err;
-        res.setHeader('Content-type','Application/json');
         let user = {
             user_id : result.insertId,
             email: req.body.email,
-            firstname: req.body.user.firstname,
-            lastname: req.body.user.lastname,
+            firstname: req.body.firstname,
+            lastname: req.body.lastname,
             isPremium: false
         };
         const token = jwt.sign({user},secretKey);
@@ -116,7 +151,7 @@ function verifyToken(req,res,next){
 }
 
 app.post('/login',(req,res)=>{
-    res.setHeader('Content-type','Application/json');
+
     let sql = `SELECT * FROM user WHERE email = '${req.body.email}'`;
     conn.query(sql, (err,result)=>{
         if (err) throw err;
@@ -293,3 +328,6 @@ app.get('/group',verifyToken, (req,res)=>{
         res.json(result);
     });
 });
+
+//serve images
+app.use('/images',express.static('images'));
