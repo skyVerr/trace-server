@@ -16,7 +16,7 @@ users = [];
 //Create server using express
 var server = app.listen(8080, ()=>{
     console.log("server started on port 8080");
-});
+}); 
 
 //Create instance of socket.io on same port of express server
 var io = require('socket.io').listen(server);
