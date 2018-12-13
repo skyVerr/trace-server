@@ -103,7 +103,6 @@ function uploadPhoto(req,res,next){
 
 app.post('/sign-up',uploadPhoto, (req,res) => {
 
-    console.log(req.body);
 
     let hash = bcrypt.hashSync(req.body.password, 10);
 
@@ -332,6 +331,44 @@ app.get('/group',verifyToken, (req,res)=>{
     conn.query(sql,[req.token.user.user_id], (err,result)=>{
         if(err) throw err;
         res.json(result);
+    });
+});
+
+app.get('/group/:id',verifyToken, (req,res)=>{
+    let group_id = req.params.id;
+    let sql = `SELECT * FROM trace_group WHERE group_id = ? `;
+    conn.query(sql,[group_id], (err,result)=>{
+        if(err) throw err;
+        res.json(result[0]);
+    });
+});
+
+app.get('/group/user/:id',verifyToken,(req,res)=>{
+    let group_id = req.params.id;
+    let sql = `SELECT user.user_id, user.firstname, user.lastname, user.profile_picture FROM user_group 
+    LEFT JOIN user ON user.user_id = user_group.user_id 
+    WHERE group_id = ? `;
+    conn.query(sql,group_id,(err,result)=>{
+        if(err) throw err;
+        res.json(result);
+    });
+});
+
+app.post('/group/user/',verifyToken,(req,res)=>{
+    
+});
+
+app.delete('/group',verifyToken, (req,res)=>{
+    let sql = `DELETE FROM trace_group WHERE group_id = ?`;
+    conn.query(sql, [req.body.group_id] , (err,result)=>{
+        res.json({message: 'Group deleted'});
+    });
+});
+
+app.patch('/group',verifyToken, (req,res)=>{
+    let sql = `UPDATE trace_group SET ? WHERE ?`;
+    conn.query(sql, [req.body , {group_id: req.body.group_id}] , (err,result)=>{
+        res.json({message: 'Group updated'});
     });
 });
 
