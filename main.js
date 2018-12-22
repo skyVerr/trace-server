@@ -9,6 +9,9 @@ const cors = require('cors');
 const formidable = require('formidable');
 var uniqid = require('uniqid');
 var Jimp = require('jimp');
+var fs = require('fs');
+var path = require('path');
+var https = require('https');
 
 app.use(bodyParser.json());
 app.use(cors({credentials: true}));
@@ -20,6 +23,7 @@ users = [];
 var server = app.listen(8080, ()=>{
     console.log("server started on port 8080");
 }); 
+  
 
 //Create instance of socket.io on same port of express server
 var io = require('socket.io').listen(server);
