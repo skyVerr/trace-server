@@ -1,0 +1,1 @@
+mysqldump -h localhost -u root db_trace > ../database/db_trace.sql
