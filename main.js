@@ -76,7 +76,12 @@ const conn = mysql.createConnection({
   });
 
 //Connect to database
-conn.connect();
+
+try {
+    conn.connect();
+} catch (error) {
+    console.log(error);
+}
 
 function uploadPhoto(req,res,next){
     var form = new formidable.IncomingForm();
@@ -106,7 +111,6 @@ function uploadPhoto(req,res,next){
 }
 
 app.post('/sign-up',uploadPhoto, (req,res) => {
-
 
     let hash = bcrypt.hashSync(req.body.password, 10);
 
