@@ -29,8 +29,7 @@ var server = app.listen(8080, ()=>{
 var io = require('socket.io').listen(server);
 
 io.on('connection',(socket)=>{
-
-    socket.emit('getId',null);
+    socket.emit('requestId',null);
 
     socket.on('setId', id => {
         users[id] = socket.id;
@@ -65,6 +64,7 @@ io.on('connection',(socket)=>{
 
 });
 
+
 console.clear();
 
 //Create Connection
@@ -92,6 +92,7 @@ function uploadPhoto(req,res,next){
     });
 
     form.on('fileBegin', function (name, file){
+        console.log(file);
         let newImageName = uniqid()+'.'+ file.name.split('.').pop();
         profilePath = __dirname + '/images/' + newImageName;
         file.path = profilePath;
