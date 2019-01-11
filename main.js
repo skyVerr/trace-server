@@ -149,15 +149,20 @@ function verifyToken(req,res,next){
     res.setHeader('Content-type','Application/json');
     const bearerHeader = req.headers['authorization'];
     if(bearerHeader !== 'undefined'){
-        const bearerToken = bearerHeader.split(' ')[1];
-        jwt.verify(bearerToken,secretKey , (err,result) =>{
-            if(err){
-                res.status(403).json({message: err.message});
-            } else {
-                req.token = result;
-                next();
-            }
-        });
+        if(bearerHeader.split(' ').length <= 1){
+            //Checks if format Bearer 'token' is correct
+            res.status(422).json({message: 'Invalid bearer fromat'});
+        } else {
+            const bearerToken = bearerHeader.split(' ')[1];
+            jwt.verify(bearerToken,secretKey , (err,result) =>{
+                if(err){
+                    res.status(403).json({message: err.message});
+                } else {
+                    req.token = result;
+                    next();
+                }
+            });
+        }
     } else {
         res.status(403).json({message: "Token missing from header"});
     }
@@ -231,8 +236,11 @@ app.delete('/contacts',verifyToken,(req,res)=>{
     console.log(req.body);
     let sql = "DELETE FROM contacts WHERE contact_id = ?";
     conn.query(sql, [req.body.contact_id], (err,result)=>{
-        if(err) throw err;
-        res.json({message: "delete success"});
+        if(err) {
+            res.status(500).json({message:'error',error:err});
+        } else {
+            res.json({message: "delete success"});
+        }
     });
 });
 
