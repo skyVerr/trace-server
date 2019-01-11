@@ -32,7 +32,7 @@ CREATE TABLE `contacts` (
   KEY `contacts_ibfk_2` (`friend_id`),
   CONSTRAINT `contacts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `contacts_ibfk_2` FOREIGN KEY (`friend_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -41,6 +41,7 @@ CREATE TABLE `contacts` (
 
 LOCK TABLES `contacts` WRITE;
 /*!40000 ALTER TABLE `contacts` DISABLE KEYS */;
+INSERT INTO `contacts` VALUES (1,67,68,'2019-01-11 15:54:31');
 /*!40000 ALTER TABLE `contacts` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -110,7 +111,7 @@ CREATE TABLE `user` (
   `email` varchar(255) NOT NULL,
   `profile_picture` varchar(255) NOT NULL DEFAULT 'http://localhost:8080/images/default.png',
   PRIMARY KEY (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -119,7 +120,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
-INSERT INTO `user` VALUES (22,'f','f','$2b$10$7VPZInatXRuYTNyf7XH8Vuh865qqKJw6/6Y2Jzgomrysc2esmQeFW',0,'2018-12-05 19:54:02','f','http://localhost:8080/images/default.png'),(23,'g','g','$2b$10$a5SBq8Ppu5sdWc7go1GeV.TmNuJ6W1Lt3IMAO06MS7aVmwj3.Bmfi',0,'2018-12-05 19:54:29','g','http://localhost:8080/images/nonn1b4jpblcpy2.jpg');
+INSERT INTO `user` VALUES (67,'ver','legaspi','$2b$10$CEhXGTKZ7YFDUq38OoPWCe77dmvgFG5BCQTN8EvdBl2LlC3kZCCM6',0,'2019-01-10 15:47:29','ver@g.com','http://localhost:8080/images/default.png'),(68,'shane','royena','$2b$10$VgL0qKce/eEluJqW3f9CE.BS8CBgxqqg5XhT8/1gXuuyiHmhEUjjO',0,'2019-01-11 15:54:11','shane@g.com','http://localhost:8080/images/default.png'),(69,'John Carlo','Miel','$2b$10$MC.Tvs9k6HmN0r2PHF2hneKsJVDM11PtkIMGIjKVCkcSYyyArFk1K',0,'2019-01-11 16:03:58','miel@g.com','http://localhost:8080/images/default.png');
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -196,4 +197,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-12-22 16:18:40
+-- Dump completed on 2019-01-12  2:56:51
