@@ -224,11 +224,21 @@ app.post('/contacts',verifyToken,(req,res)=>{
 
 
 app.get('/contacts',verifyToken,(req,res)=>{
-    let sql = "SELECT * FROM contacts WHERE user_id = ?";
+    let sql = "SELECT * FROM contacts WHERE user_id = ? ";
+
+    if(req.query.friend_id){
+        sql += `AND friend_id = ${escape(req.query.friend_id)} `;
+    }
 
     conn.query(sql, [req.token.user.user_id], (err,result)=>{
-        if(err) throw err;
-        res.json(result);
+        if(err) {
+            res.status(500).json({message:'error',error:err});
+        } else {
+            if(req.query.friend_id)
+                res.json(result[0]);
+             else 
+                res.json(result);
+        }
     });
 });
 
@@ -248,18 +258,47 @@ app.get('/notification',verifyToken,(req,res)=>{
     let sql = "SELECT * FROM user_notification WHERE user_id = ?";
 
     conn.query(sql, [req.token.user.user_id], (err,result)=>{
-        if(err) throw err;
-        res.json(result);
+        if(err) {
+            res.status(500).json({message:'error',error:err});
+        } else {
+            res.json(result);
+        }
     });
+});
+
+app.delete('/notification',verifyToken, (req,res) => {
+    console.log(req.body);
+});
+
+app.get('/notification/search',verifyToken, (req,res) => {
+    let sql = "SELECT * FROM user_notification ";
+
+    if(Object.keys(req.query).length > 0){
+        sql += "WHERE ";
+        let fields = [];
+        Object.keys(req.query)
+            .forEach(key => {
+                fields.push(`${escape(key)} = '${escape(req.query[key])}'`);
+            });
+        sql += fields.join(' AND ');
+    }
+    conn.query(sql, (err,result) => {
+        if(err){
+            res.status(500).json({error: err});
+        } else {
+            res.json(result);
+        }
+    })
 });
 
 app.post('/notification',verifyToken,(req,res)=>{
     let sql = "INSERT INTO user_notification SET ? ";
     conn.query(sql, [req.body], (err,result)=>{
-        if(err) throw err;
-        io.to(users[req.body.user_id])
-            .emit('new notification',{notification:`Someone wants to trace you`});
-        res.json({message: "Notification sent"});
+        if(err) {
+            res.status(500).json({error: err});
+        } else {
+            res.json({message: "Notification sent"});
+        }
     });
 });
 
@@ -274,22 +313,23 @@ app.post('/notification/decline',verifyToken,(req,res)=>{
 
 app.post('/notification/confirm',verifyToken,(req,res)=>{
 
-    if(req.body.notification.notification_type_id == 1){
-        if(req.body.notification.isConfirm == true){
+    if(req.body.notification_type_id == 1){
     
-            let insert = [[req.body.notification.from_user_id],[req.body.notification.user_id]];
-            let sql = "INSERT INTO contacts(user_id,friend_id) VALUES (?)";
-    
-            conn.query(sql,[insert],(err,result)=>{
-                if(err) console.log(err);
-                io.to(users[req.body.user_id])
-                    .emit('new notification',{notification:`Your request has been accepted`});
+        let insert = [[req.body.from_user_id],[req.body.user_id]];
+        let sql = "INSERT INTO contacts(user_id,friend_id) VALUES (?)";
+
+        conn.query(sql,[insert],(err,result)=>{
+            if(err){
+                res.json(500, {error: err});
+            } else {
+                // io.to(users[req.body.user_id])
+                //     .emit('new notification',{notification:`Your request has been accepted`});
                 deleteNotificaton(req,res);
-            });
-        }
+            }
+        });
     } 
 
-    if(req.body.notification.notification_type_id == 2){
+    if(req.body.notification_type_id == 2){
         deleteNotificaton(req,res);
     }
     
@@ -297,11 +337,13 @@ app.post('/notification/confirm',verifyToken,(req,res)=>{
 
 function deleteNotificaton(req,res){
 
-    let sql = "DELETE FROM user_notification WHERE user_notification_id =  "+req.body.notification.user_notification_id;  
+    let sql = "DELETE FROM user_notification WHERE user_notification_id =  "+req.body.user_notification_id;  
 
     let ha = conn.query(sql ,(err,result)=>{
-        if(err) throw err;
-        res.json({message: 'notification confirm'});
+        if(err){
+            res.json(500, {error: err});
+        } else 
+            res.json({message: 'notification confirm'});
     });
 
 }
@@ -313,6 +355,26 @@ app.get('/user/:id',verifyToken,(req,res)=>{
         if(err) throw err;
         res.json(result[0]);
     });
+});
+
+app.get('/user',verifyToken,(req,res) => {
+    let sql = "SELECT user_id, firstname, lastname, isPremium, date_created, email, profile_picture FROM user ";
+
+    if(req.query.q){
+        let q = escape(req.query.q);
+        sql += `WHERE firstname LIKE '%${q}%' OR lastname LIKE '%${q}%'  OR email LIKE '%${q}%'`;
+    } 
+
+    conn.query(sql,(err,result)=>{
+        if(err){
+            res
+                .status(500)
+                .json({error:err});
+        } else {
+            res.json(result);
+        }
+    });
+
 });
 
 app.get('/notification-type/:id',verifyToken,(req,res)=>{
