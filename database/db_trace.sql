@@ -32,7 +32,7 @@ CREATE TABLE `contacts` (
   KEY `contacts_ibfk_2` (`friend_id`),
   CONSTRAINT `contacts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `contacts_ibfk_2` FOREIGN KEY (`friend_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -41,7 +41,7 @@ CREATE TABLE `contacts` (
 
 LOCK TABLES `contacts` WRITE;
 /*!40000 ALTER TABLE `contacts` DISABLE KEYS */;
-INSERT INTO `contacts` VALUES (2,67,68,'2019-01-12 18:21:40');
+INSERT INTO `contacts` VALUES (2,67,68,'2019-01-12 18:21:40'),(3,67,69,'2019-01-14 14:43:19');
 /*!40000 ALTER TABLE `contacts` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -110,6 +110,7 @@ CREATE TABLE `user` (
   `date_created` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `email` varchar(255) NOT NULL,
   `profile_picture` varchar(255) NOT NULL DEFAULT 'http://localhost:8080/images/default.png',
+  `isAdmin` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -120,7 +121,7 @@ CREATE TABLE `user` (
 
 LOCK TABLES `user` WRITE;
 /*!40000 ALTER TABLE `user` DISABLE KEYS */;
-INSERT INTO `user` VALUES (67,'ver','legaspi','$2b$10$CEhXGTKZ7YFDUq38OoPWCe77dmvgFG5BCQTN8EvdBl2LlC3kZCCM6',0,'2019-01-10 15:47:29','ver@g.com','http://localhost:8080/images/default.png'),(68,'shane','royena','$2b$10$VgL0qKce/eEluJqW3f9CE.BS8CBgxqqg5XhT8/1gXuuyiHmhEUjjO',0,'2019-01-11 15:54:11','shane@g.com','http://localhost:8080/images/default.png'),(69,'John Carlo','Miel','$2b$10$MC.Tvs9k6HmN0r2PHF2hneKsJVDM11PtkIMGIjKVCkcSYyyArFk1K',0,'2019-01-11 16:03:58','miel@g.com','http://localhost:8080/images/default.png');
+INSERT INTO `user` VALUES (67,'ver','legaspi','$2b$10$CEhXGTKZ7YFDUq38OoPWCe77dmvgFG5BCQTN8EvdBl2LlC3kZCCM6',0,'2019-01-10 15:47:29','ver@g.com','http://localhost:8080/images/default.png',0),(68,'shane','royena','$2b$10$VgL0qKce/eEluJqW3f9CE.BS8CBgxqqg5XhT8/1gXuuyiHmhEUjjO',0,'2019-01-11 15:54:11','shane@g.com','http://localhost:8080/images/default.png',0),(69,'John Carlo','Miel','$2b$10$MC.Tvs9k6HmN0r2PHF2hneKsJVDM11PtkIMGIjKVCkcSYyyArFk1K',0,'2019-01-11 16:03:58','miel@g.com','http://localhost:8080/images/default.png',0);
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -176,7 +177,7 @@ CREATE TABLE `user_notification` (
   CONSTRAINT `user_notification_ibfk_1` FOREIGN KEY (`notification_type_id`) REFERENCES `notification_type` (`notification_type_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `user_notification_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `user_notification_ibfk_3` FOREIGN KEY (`from_user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -197,4 +198,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2019-01-13  2:29:20
+-- Dump completed on 2019-01-15  1:04:36

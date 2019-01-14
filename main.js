@@ -68,20 +68,15 @@ io.on('connection',(socket)=>{
 console.clear();
 
 //Create Connection
-const conn = mysql.createConnection({
+const pool = mysql.createPool({
     host     : 'localhost',
     user     : 'root',
     password : '',
-    database : 'db_trace'
+    database : 'db_trace',
+    connectionLimit: 500
   });
 
 //Connect to database
-
-try {
-    conn.connect();
-} catch (error) {
-    console.log(error);
-}
 
 function uploadPhoto(req,res,next){
     var form = new formidable.IncomingForm();
@@ -125,22 +120,26 @@ app.post('/sign-up',uploadPhoto, (req,res) => {
         sql += `, profile_picture ='${req.body.profile_picture}'`;
     }
     
-    conn.query(sql, (err,result)=> {
-        if(err) throw err;
-        let user = {
-            user_id : result.insertId,
-            email: req.body.email,
-            firstname: req.body.firstname,
-            lastname: req.body.lastname,
-            isPremium: false
-        };
-        if(!!req.body.profile_picture) {
-            user.profile_picture = req.body.profile_picture;
-        } else {
-            user.profile_picture = 'http://localhost:8080/images/default.png';
+    pool.query(sql, (err,result)=> {
+        if(err)
+            res.json(500,{error: err});
+        else {
+            let user = {
+                user_id : result.insertId,
+                email: req.body.email,
+                firstname: req.body.firstname,
+                lastname: req.body.lastname,
+                isPremium: false,
+                isAdmin: req.body.isAdmin
+            };
+            if(!!req.body.profile_picture) {
+                user.profile_picture = req.body.profile_picture;
+            } else {
+                user.profile_picture = 'http://localhost:8080/images/default.png';
+            }
+            const token = jwt.sign({user},secretKey);
+            res.json({token});
         }
-        const token = jwt.sign({user},secretKey);
-        res.json({token});
     });
     
 });
@@ -148,7 +147,7 @@ app.post('/sign-up',uploadPhoto, (req,res) => {
 function verifyToken(req,res,next){
     res.setHeader('Content-type','Application/json');
     const bearerHeader = req.headers['authorization'];
-    if(bearerHeader !== 'undefined'){
+    if(!!bearerHeader){
         if(bearerHeader.split(' ').length <= 1){
             //Checks if format Bearer 'token' is correct
             res.status(422).json({message: 'Invalid bearer fromat'});
@@ -168,28 +167,39 @@ function verifyToken(req,res,next){
     }
 }
 
+function verifyId(req, res, next){
+    if(isNaN(req.params.id))
+        res.json(422, {message: "Id should be a valid number"});
+    else
+        next();
+}
+
 app.post('/login',(req,res)=>{
 
     let sql = `SELECT * FROM user WHERE email = '${req.body.email}'`;
-    conn.query(sql, (err,result)=>{
-        if (err) throw err;
-        if(result.length == 1){
-            if(bcrypt.compareSync(req.body.password, result[0].password)){
-                let user = {
-                    user_id : result[0].user_id,
-                    email: result[0].email,
-                    firstname: result[0].firstname,
-                    lastname: result[0].lastname,
-                    isPremium: result[0].isPremium,
-                    profile_picture: result[0].profile_picture
-                };
-                const token = jwt.sign({user},secretKey);
-                res.json({token});
+    pool.query(sql, (err,result)=>{
+        if (err) 
+            res.json(500, {error: err});
+        else{
+            if(result.length == 1){
+                if(bcrypt.compareSync(req.body.password, result[0].password)){
+                    let user = {
+                        user_id : result[0].user_id,
+                        email: result[0].email,
+                        firstname: result[0].firstname,
+                        lastname: result[0].lastname,
+                        isPremium: result[0].isPremium,
+                        profile_picture: result[0].profile_picture,
+                        isAdmin: result[0].isAdmin
+                    };
+                    const token = jwt.sign({user},secretKey);
+                    res.json({token});
+                } else {
+                    res.status(400).json({message: "Invalid username/password"});
+                }
             } else {
-                res.status(400).json({message: "Invalid username/password"});
+                res.status(400).json({message:"Invalid username/password"});
             }
-        } else {
-            res.status(400).json({message:"Invalid username/password"});
         }
     });
 });
@@ -198,7 +208,7 @@ app.post('/contacts',verifyToken,(req,res)=>{
 
     let sql = `SELECT user_id FROM user WHERE email = ?`;
     
-    conn.query(sql, [req.body.email], (err,result) => {
+    pool.query(sql, [req.body.email], (err,result) => {
         if (err) throw err;
         if(result.length == 1){
 
@@ -206,7 +216,7 @@ app.post('/contacts',verifyToken,(req,res)=>{
 
             sql = "INSERT INTO user_notification(user_id,notification_type_id,from_user_id) VALUES (?) ";
             
-            let query = conn.query(sql, [notification], (err,result2)=>{
+            let query = pool.query(sql, [notification], (err,result2)=>{
                 if(err) throw err;
 
                     io.to(users[result[0].user_id])
@@ -230,7 +240,7 @@ app.get('/contacts',verifyToken,(req,res)=>{
         sql += `AND friend_id = ${escape(req.query.friend_id)} `;
     }
 
-    conn.query(sql, [req.token.user.user_id], (err,result)=>{
+    pool.query(sql, [req.token.user.user_id], (err,result)=>{
         if(err) {
             res.status(500).json({message:'error',error:err});
         } else {
@@ -242,10 +252,25 @@ app.get('/contacts',verifyToken,(req,res)=>{
     });
 });
 
+app.get('/users/:id/contacts', [verifyToken, verifyId], (req, res) => {
+    const user_id = req.params.id;
+    if(req.token.isAdmin || req.token.user.user_id == user_id){
+        let sql = "SELECT * FROM contacts WHERE user_id = ? ";
+        pool.query(sql, [user_id], (err, result)=>{
+            if(err)
+                return res.json(500, {error: err});
+            res.json(result);
+        });
+    } else {
+        res.json(401, {message: "You are not allowed to make this operation"});
+    }
+
+})
+
+
 app.delete('/contacts',verifyToken,(req,res)=>{
-    console.log(req.body);
     let sql = "DELETE FROM contacts WHERE contact_id = ?";
-    conn.query(sql, [req.body.contact_id], (err,result)=>{
+    pool.query(sql, [req.body.contact_id], (err,result)=>{
         if(err) {
             res.status(500).json({message:'error',error:err});
         } else {
@@ -257,7 +282,7 @@ app.delete('/contacts',verifyToken,(req,res)=>{
 app.get('/notification',verifyToken,(req,res)=>{
     let sql = "SELECT * FROM user_notification WHERE user_id = ?";
 
-    conn.query(sql, [req.token.user.user_id], (err,result)=>{
+    pool.query(sql, [req.token.user.user_id], (err,result)=>{
         if(err) {
             res.status(500).json({message:'error',error:err});
         } else {
@@ -282,7 +307,7 @@ app.get('/notification/search',verifyToken, (req,res) => {
             });
         sql += fields.join(' AND ');
     }
-    conn.query(sql, (err,result) => {
+    pool.query(sql, (err,result) => {
         if(err){
             res.status(500).json({error: err});
         } else {
@@ -293,7 +318,7 @@ app.get('/notification/search',verifyToken, (req,res) => {
 
 app.post('/notification',verifyToken,(req,res)=>{
     let sql = "INSERT INTO user_notification SET ? ";
-    conn.query(sql, [req.body], (err,result)=>{
+    pool.query(sql, [req.body], (err,result)=>{
         if(err) {
             res.status(500).json({error: err});
         } else {
@@ -304,7 +329,7 @@ app.post('/notification',verifyToken,(req,res)=>{
 
 app.post('/notification/decline',verifyToken,(req,res)=>{
     let sql = "DELETE FROM user_notification WHERE user_notification_id = ? ";
-    conn.query(sql, [req.body.user_notification_id], (err,result)=>{
+    pool.query(sql, [req.body.user_notification_id], (err,result)=>{
         if(err) throw err;
         res.json("Decline success");
     });   
@@ -318,7 +343,7 @@ app.post('/notification/confirm',verifyToken,(req,res)=>{
         let insert = [[req.body.from_user_id],[req.body.user_id]];
         let sql = "INSERT INTO contacts(user_id,friend_id) VALUES (?)";
 
-        conn.query(sql,[insert],(err,result)=>{
+        pool.query(sql,[insert],(err,result)=>{
             if(err){
                 res.json(500, {error: err});
             } else {
@@ -339,7 +364,7 @@ function deleteNotificaton(req,res){
 
     let sql = "DELETE FROM user_notification WHERE user_notification_id =  "+req.body.user_notification_id;  
 
-    let ha = conn.query(sql ,(err,result)=>{
+    let ha = pool.query(sql ,(err,result)=>{
         if(err){
             res.json(500, {error: err});
         } else 
@@ -351,7 +376,7 @@ function deleteNotificaton(req,res){
 app.get('/user/:id',verifyToken,(req,res)=>{
     let sql = "SELECT user_id,email,firstname,lastname,profile_picture FROM user WHERE user_id = ?";
 
-    conn.query(sql,[req.params.id],(err,result)=>{
+    pool.query(sql,[req.params.id],(err,result)=>{
         if(err) throw err;
         res.json(result[0]);
     });
@@ -365,7 +390,7 @@ app.get('/user',verifyToken,(req,res) => {
         sql += `WHERE firstname LIKE '%${q}%' OR lastname LIKE '%${q}%'  OR email LIKE '%${q}%'`;
     } 
 
-    conn.query(sql,(err,result)=>{
+    pool.query(sql,(err,result)=>{
         if(err){
             res
                 .status(500)
@@ -380,7 +405,7 @@ app.get('/user',verifyToken,(req,res) => {
 app.get('/notification-type/:id',verifyToken,(req,res)=>{
     let sql = "SELECT * FROM notification_type WHERE notification_type_id = ?";
 
-    conn.query(sql,[req.params.id],(err,result)=>{
+    pool.query(sql,[req.params.id],(err,result)=>{
         if(err) throw err;
         res.json(result[0]);
     });
@@ -388,11 +413,11 @@ app.get('/notification-type/:id',verifyToken,(req,res)=>{
 
 app.post('/group',verifyToken, (req,res)=>{
     let sql = "INSERT INTO trace_group(name) VALUES (?)";
-    conn.query(sql,[req.body.name],(err,result)=>{
+    pool.query(sql,[req.body.name],(err,result)=>{
         if(err) throw err;
         sql = "INSERT INTO user_group(user_id,group_id,isAdmin) VALUES (?)"
         let insert = [req.token.user.user_id,result.insertId,1];
-        conn.query(sql,[insert],(err,result2)=>{
+        pool.query(sql,[insert],(err,result2)=>{
             if(err) throw err;
             res.json({
                 group_id: result.insertId,
@@ -407,7 +432,7 @@ app.get('/group',verifyToken, (req,res)=>{
     FROM user_group 
     INNER JOIN trace_group ON trace_group.group_id = user_group.group_id 
     WHERE user_group.user_id = ?`;
-    conn.query(sql,[req.token.user.user_id], (err,result)=>{
+    pool.query(sql,[req.token.user.user_id], (err,result)=>{
         if(err) throw err;
         res.json(result);
     });
@@ -416,7 +441,7 @@ app.get('/group',verifyToken, (req,res)=>{
 app.get('/group/:id',verifyToken, (req,res)=>{
     let group_id = req.params.id;
     let sql = `SELECT * FROM trace_group WHERE group_id = ? `;
-    conn.query(sql,[group_id], (err,result)=>{
+    pool.query(sql,[group_id], (err,result)=>{
         if(err) throw err;
         res.json(result[0]);
     });
@@ -427,7 +452,7 @@ app.get('/group/user/:id',verifyToken,(req,res)=>{
     let sql = `SELECT user.user_id, user.firstname, user.lastname, user.profile_picture FROM user_group 
     LEFT JOIN user ON user.user_id = user_group.user_id 
     WHERE group_id = ? `;
-    conn.query(sql,group_id,(err,result)=>{
+    pool.query(sql,group_id,(err,result)=>{
         if(err) throw err;
         res.json(result);
     });
@@ -439,14 +464,14 @@ app.post('/group/user/',verifyToken,(req,res)=>{
 
 app.delete('/group',verifyToken, (req,res)=>{
     let sql = `DELETE FROM trace_group WHERE group_id = ?`;
-    conn.query(sql, [req.body.group_id] , (err,result)=>{
+    pool.query(sql, [req.body.group_id] , (err,result)=>{
         res.json({message: 'Group deleted'});
     });
 });
 
 app.patch('/group',verifyToken, (req,res)=>{
     let sql = `UPDATE trace_group SET ? WHERE ?`;
-    conn.query(sql, [req.body , {group_id: req.body.group_id}] , (err,result)=>{
+    pool.query(sql, [req.body , {group_id: req.body.group_id}] , (err,result)=>{
         res.json({message: 'Group updated'});
     });
 });
