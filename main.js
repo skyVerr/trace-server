@@ -122,7 +122,7 @@ app.post('/sign-up',uploadPhoto, (req,res) => {
     
     pool.query(sql, (err,result)=> {
         if(err)
-            res.json(500,{error: err});
+        res.status(500).json({error: err});
         else {
             let user = {
                 user_id : result.insertId,
@@ -169,7 +169,7 @@ function verifyToken(req,res,next){
 
 function verifyId(req, res, next){
     if(isNaN(req.params.id))
-        res.json(422, {message: "Id should be a valid number"});
+        res.status(422).json({message: "Id should be a valid number"});
     else
         next();
 }
@@ -179,7 +179,7 @@ app.post('/login',(req,res)=>{
     let sql = `SELECT * FROM user WHERE email = '${req.body.email}'`;
     pool.query(sql, (err,result)=>{
         if (err) 
-            res.json(500, {error: err});
+            res.status(500).json({error: err});
         else{
             if(result.length == 1){
                 if(bcrypt.compareSync(req.body.password, result[0].password)){
@@ -258,7 +258,7 @@ app.get('/users/:id/contacts', [verifyToken, verifyId], (req, res) => {
         let sql = "SELECT * FROM contacts WHERE user_id = ? ";
         pool.query(sql, [user_id], (err, result)=>{
             if(err)
-                return res.json(500, {error: err});
+                return  res.status(500).json({error: err});
             res.json(result);
         });
     } else {
@@ -345,7 +345,7 @@ app.post('/notification/confirm',verifyToken,(req,res)=>{
 
         pool.query(sql,[insert],(err,result)=>{
             if(err){
-                res.json(500, {error: err});
+                 res.status(500).json({error: err});
             } else {
                 // io.to(users[req.body.user_id])
                 //     .emit('new notification',{notification:`Your request has been accepted`});
@@ -366,14 +366,14 @@ function deleteNotificaton(req,res){
 
     let ha = pool.query(sql ,(err,result)=>{
         if(err){
-            res.json(500, {error: err});
+             res.status(500).json({error: err});
         } else 
             res.json({message: 'notification confirm'});
     });
 
 }
 
-app.get('/user/:id',verifyToken,(req,res)=>{
+app.get('/user/:id',[verifyToken,verifyId],(req,res)=>{
     let sql = "SELECT user_id,email,firstname,lastname,profile_picture FROM user WHERE user_id = ?";
 
     pool.query(sql,[req.params.id],(err,result)=>{
@@ -411,70 +411,48 @@ app.get('/notification-type/:id',verifyToken,(req,res)=>{
     });
 });
 
-app.post('/group',verifyToken, (req,res)=>{
-    let sql = "INSERT INTO trace_group(name) VALUES (?)";
-    pool.query(sql,[req.body.name],(err,result)=>{
-        if(err) throw err;
-        sql = "INSERT INTO user_group(user_id,group_id,isAdmin) VALUES (?)"
-        let insert = [req.token.user.user_id,result.insertId,1];
-        pool.query(sql,[insert],(err,result2)=>{
-            if(err) throw err;
-            res.json({
-                group_id: result.insertId,
-                name: req.body.name
-            });
+app.post('/groups', verifyToken, (req,res) => {
+    let sql = "INSERT INTO trace_group SET ?";
+    let groupId = 0;
+    pool.query(sql,[req.body],(err,result)=>{
+        if(err) return res.status(500).json({error: err});
+        groupId = result.insertId;
+        let insert = {
+            user_id: req.token.user.user_id,
+            group_id: groupId,
+            isAdmin: true
+        };
+        sql = "INSERT INTO user_group SET ?";
+        pool.query(sql, [insert], (err,result) => {
+            if(err) return  res.status(500).json({error: err});
+            res.json({group_id: groupId,name: req.body.name});
         });
-    })
+    });
 });
 
-app.get('/group',verifyToken, (req,res)=>{
-    let sql = `SELECT trace_group.group_id ,trace_group.name 
-    FROM user_group 
-    INNER JOIN trace_group ON trace_group.group_id = user_group.group_id 
-    WHERE user_group.user_id = ?`;
-    pool.query(sql,[req.token.user.user_id], (err,result)=>{
-        if(err) throw err;
+app.get('/groups/:id', [verifyToken, verifyId], (req, res) => {
+    let sql = "SELECT * FROM trace_group WHERE group_id = ?";
+    pool.query(sql, [req.params.id], (err,result) => {
+        if(err) return res.status(500).json({error: err});
+        res.status(200).json(result[0]);
+    });
+});
+
+app.get('/user/:id/groups', [verifyToken,verifyId], (req,res) => {
+    let sql ="SELECT * FROM user_group WHERE user_id = ?";
+    pool.query(sql, [req.params.id], (err,result) => {
+        if(err) return res.status(500).json({error: err});
         res.json(result);
     });
 });
 
-app.get('/group/:id',verifyToken, (req,res)=>{
-    let group_id = req.params.id;
-    let sql = `SELECT * FROM trace_group WHERE group_id = ? `;
-    pool.query(sql,[group_id], (err,result)=>{
-        if(err) throw err;
-        res.json(result[0]);
-    });
-});
-
-app.get('/group/user/:id',verifyToken,(req,res)=>{
-    let group_id = req.params.id;
-    let sql = `SELECT user.user_id, user.firstname, user.lastname, user.profile_picture FROM user_group 
-    LEFT JOIN user ON user.user_id = user_group.user_id 
-    WHERE group_id = ? `;
-    pool.query(sql,group_id,(err,result)=>{
-        if(err) throw err;
+app.get('/groups/:id/members', [verifyToken, verifyId], (req, res)=> {
+    let sql = "SELECT * FROM user_group WHERE group_id = ?";
+    pool.query(sql, [req.params.id], (err,result) => {
+        if(err) return res.status(500).json({error: err});
         res.json(result);
     });
-});
-
-app.post('/group/user/',verifyToken,(req,res)=>{
-    
-});
-
-app.delete('/group',verifyToken, (req,res)=>{
-    let sql = `DELETE FROM trace_group WHERE group_id = ?`;
-    pool.query(sql, [req.body.group_id] , (err,result)=>{
-        res.json({message: 'Group deleted'});
-    });
-});
-
-app.patch('/group',verifyToken, (req,res)=>{
-    let sql = `UPDATE trace_group SET ? WHERE ?`;
-    pool.query(sql, [req.body , {group_id: req.body.group_id}] , (err,result)=>{
-        res.json({message: 'Group updated'});
-    });
-});
+})
 
 app.get('/merge-photo',(req,res)=>{
     //CALLBACK HELL!
