@@ -452,6 +452,14 @@ app.get('/groups/:id/members', [verifyToken, verifyId], (req, res)=> {
         if(err) return res.status(500).json({error: err});
         res.json(result);
     });
+});
+
+app.post('/members', [verifyToken, verifyId], (req, res) => {
+    let sql = "INSERT INTO user_group SET ?";
+    pool.query(sql, [req.body], (err,result) => {
+        if(err) return res.status(500).json({error: err});
+        res.status(201).json({message: "Inserted!"});
+    });
 })
 
 app.get('/merge-photo',(req,res)=>{
